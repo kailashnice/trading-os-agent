@@ -2,11 +2,13 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 
-const quickPrompts = [
-  { label: "Pre-session check", text: "Review this pre-session plan for rule compliance." },
-  { label: "Trade audit", text: "Audit this trade. Separate process quality from P&L." },
-  { label: "Second-trade urge", text: "I want to take a second trade because this setup is A+." },
-  { label: "Post-session review", text: "Create a concise post-session review from this journal." }
+type IconKey = "shield" | "scan" | "flame" | "clipboard";
+
+const quickPrompts: { label: string; text: string; icon: IconKey }[] = [
+  { label: "Pre-session check", text: "Review this pre-session plan for rule compliance.", icon: "shield" },
+  { label: "Trade audit", text: "Audit this trade. Separate process quality from P&L.", icon: "scan" },
+  { label: "Second-trade urge", text: "I want to take a second trade because this setup is A+.", icon: "flame" },
+  { label: "Post-session review", text: "Create a concise post-session review from this journal.", icon: "clipboard" }
 ];
 
 const systemRules = [
@@ -19,16 +21,109 @@ const systemRules = [
 
 type Message = { role: "user" | "assistant"; content: string };
 
+/* Custom icon set */
+function LogoMark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="ic-logo">
+      <rect x="3.5" y="10" width="3.4" height="8" rx="1.2" fill="currentColor" opacity="0.55" className="bar b1" />
+      <rect x="10.3" y="6" width="3.4" height="12" rx="1.2" fill="currentColor" className="bar b2" />
+      <rect x="17.1" y="8.5" width="3.4" height="9.5" rx="1.2" fill="currentColor" opacity="0.75" className="bar b3" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="1.8" />
+      <g stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7" />
+      </g>
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20 14.3A8 8 0 0 1 9.7 4 7.5 7.5 0 1 0 20 14.3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PromptIcon({ name }: { name: IconKey }) {
+  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  if (name === "shield")
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3l7 2.5v5.4c0 4.4-3 7.6-7 9.1-4-1.5-7-4.7-7-9.1V5.5L12 3Z" {...common} />
+        <path d="M9 11.8l2.1 2.1L15 9.9" {...common} />
+      </svg>
+    );
+  if (name === "scan")
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="11" cy="11" r="6" {...common} />
+        <path d="M20 20l-4.3-4.3M11 8v6M8 11h6" {...common} />
+      </svg>
+    );
+  if (name === "flame")
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3s5 3.6 5 8.4a5 5 0 0 1-10 0c0-1.6.8-2.9 1.6-3.8.4 1 1.1 1.6 1.9 1.6 0-2.4.9-4.5 1.5-6.2Z" {...common} />
+      </svg>
+    );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="5" y="4" width="14" height="17" rx="2.2" {...common} />
+      <path d="M9 3.5h6v2.2H9zM8.5 10.5h7M8.5 14h7M8.5 17.5h4" {...common} />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="8.2" r="3.6" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M4.8 20c.7-3.7 3.6-6 7.2-6s6.5 2.3 7.2 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const current = document.documentElement.getAttribute("data-theme");
+    if (current === "light" || current === "dark") setTheme(current);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isLoading]);
+
+  function toggleTheme() {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try {
+        localStorage.setItem("trading-os-theme", next);
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }
 
   async function sendMessage(event?: FormEvent, suppliedDraft?: string) {
     event?.preventDefault();
@@ -70,20 +165,37 @@ export default function Home() {
   return (
     <div className="app">
       <div className="aurora" aria-hidden="true" />
+      <div className="grid-veil" aria-hidden="true" />
 
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            <span className="brand-mark-inner" />
+            <LogoMark />
           </span>
           <div className="brand-copy">
             <p className="brand-name">Trading OS</p>
             <p className="brand-sub">Accountability Agent</p>
           </div>
         </div>
-        <div className="status">
-          <span className="status-dot" aria-hidden="true" />
-          <span>System v2 · Live</span>
+        <div className="topbar-actions">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            aria-pressed={theme === "light"}
+          >
+            <span className="theme-icon sun">
+              <SunIcon />
+            </span>
+            <span className="theme-icon moon">
+              <MoonIcon />
+            </span>
+          </button>
+          <div className="status">
+            <span className="status-dot" aria-hidden="true" />
+            <span>System v2 · Live</span>
+          </div>
         </div>
       </header>
 
@@ -99,8 +211,8 @@ export default function Home() {
           </p>
 
           <div className="rulestrip" role="list" aria-label="Current operative system">
-            {systemRules.map((rule) => (
-              <div className="rule" role="listitem" key={rule.k}>
+            {systemRules.map((rule, i) => (
+              <div className="rule" role="listitem" key={rule.k} style={{ animationDelay: `${i * 70}ms` }}>
                 <span className="rule-k">{rule.k}</span>
                 <span className="rule-v">{rule.v}</span>
               </div>
@@ -137,14 +249,20 @@ export default function Home() {
                   adherence before outcome.
                 </p>
                 <div className="quick-prompts">
-                  {quickPrompts.map((prompt) => (
+                  {quickPrompts.map((prompt, i) => (
                     <button
                       key={prompt.label}
                       onClick={() => sendMessage(undefined, prompt.text)}
                       disabled={isLoading}
+                      style={{ animationDelay: `${i * 80}ms` }}
                     >
-                      <span className="qp-label">{prompt.label}</span>
-                      <span className="qp-text">{prompt.text}</span>
+                      <span className="qp-icon" aria-hidden="true">
+                        <PromptIcon name={prompt.icon} />
+                      </span>
+                      <span className="qp-copy">
+                        <span className="qp-label">{prompt.label}</span>
+                        <span className="qp-text">{prompt.text}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -154,7 +272,7 @@ export default function Home() {
             {messages.map((message, index) => (
               <article key={`${message.role}-${index}`} className={`message ${message.role}`}>
                 <div className="avatar" aria-hidden="true">
-                  {message.role === "user" ? "You" : "OS"}
+                  {message.role === "user" ? <UserIcon /> : <LogoMark />}
                 </div>
                 <div className="bubble">
                   <p className="message-label">{message.role === "user" ? "You" : "Coach"}</p>
@@ -166,7 +284,7 @@ export default function Home() {
             {isLoading && (
               <article className="message assistant">
                 <div className="avatar" aria-hidden="true">
-                  OS
+                  <LogoMark />
                 </div>
                 <div className="bubble">
                   <p className="message-label">Coach</p>
